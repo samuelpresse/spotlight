@@ -28,7 +28,7 @@ import { LuFileUp, LuImage, LuRotateCcw, LuSave } from "react-icons/lu";
 import { toaster } from "@/components/ui/toaster";
 import { slugify, today } from "@/lib/format";
 import type { Magazine } from "@/lib/types";
-import { uploadFile, type StorageMode } from "@/lib/upload-client";
+import { uploadFile, uploadFiles, type StorageMode } from "@/lib/upload-client";
 import { checkSlugAvailable, saveMagazine } from "./actions";
 
 type Props = { magazine?: Magazine; storageMode: StorageMode };
@@ -44,7 +44,18 @@ const card = {
   p: { base: "5", md: "7" },
 } as const;
 
-export function MagazineForm({ magazine, storageMode }: Props) {
+export function MagazineForm(props: Props) {
+  const [version, setVersion] = useState(0);
+  return (
+    <MagazineFormFields
+      key={`${version}:${props.magazine?.updatedAt ?? "new"}`}
+      {...props}
+      onSaved={() => setVersion((v) => v + 1)}
+    />
+  );
+}
+
+function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSaved: () => void }) {
   const router = useRouter();
   const editing = !!magazine;
 
@@ -75,6 +86,9 @@ export function MagazineForm({ magazine, storageMode }: Props) {
   useEffect(() => () => void (coverPreview && URL.revokeObjectURL(coverPreview)), [coverPreview]);
 
   const pageCount = pdfInfo?.pageCount ?? magazine?.pageCount ?? 0;
+  const isLegacy = editing && (magazine?.pages.length ?? 0) === 0;
+  const [optimize, setOptimize] = useState(true);
+  const convertLegacy = isLegacy && optimize && !pdfFile;
   const saving = progress !== null;
 
   async function choosePdf(file: File | undefined) {
@@ -115,10 +129,29 @@ export function MagazineForm({ magazine, storageMode }: Props) {
         return setError(`L'adresse « ${effectiveSlug} » est déjà utilisée. Choisis-en une autre.`);
       }
 
+      let pageFiles: File[] = [];
+      let pageRatio = magazine?.pageRatio ?? 0;
+      const pdfSource = pdfFile ?? (convertLegacy ? magazine?.pdfUrl : null);
+      if (pdfSource) {
+        const { renderPdfPages } = await import("@/lib/pdf-client");
+        const rendered = await renderPdfPages(pdfSource, effectiveSlug, (done, total) =>
+          setProgress({ label: `Préparation des pages… ${done}/${total}`, percent: (done / total) * 100 })
+        );
+        pageFiles = rendered.pages;
+        pageRatio = rendered.ratio;
+      }
+
       let pdfUrl = magazine?.pdfUrl ?? "";
       if (pdfFile) {
         pdfUrl = await uploadFile(pdfFile, storageMode, (percent) =>
           setProgress({ label: "Envoi du PDF…", percent })
+        );
+      }
+
+      let pages = magazine?.pages ?? [];
+      if (pageFiles.length > 0) {
+        pages = await uploadFiles(pageFiles, storageMode, (done, total) =>
+          setProgress({ label: `Envoi des pages… ${done}/${total}`, percent: (done / total) * 100 })
         );
       }
 
@@ -140,6 +173,8 @@ export function MagazineForm({ magazine, storageMode }: Props) {
         pdfUrl,
         coverUrl,
         pageCount,
+        pages,
+        pageRatio,
       });
 
       if (!result.ok) {
@@ -147,6 +182,7 @@ export function MagazineForm({ magazine, storageMode }: Props) {
         return setError(result.error);
       }
       toaster.create({ type: "success", title: editing ? "Magazine mis à jour." : "Magazine publié !" });
+      onSaved();
       router.push("/admin");
       router.refresh();
     } catch (err) {
@@ -267,6 +303,28 @@ export function MagazineForm({ magazine, storageMode }: Props) {
                 e.target.value = "";
               }}
             />
+            {isLegacy && !pdfFile && (
+              <Switch.Root
+                checked={optimize}
+                onCheckedChange={(e) => setOptimize(e.checked)}
+                colorPalette="brand"
+                size="sm"
+                disabled={saving}
+              >
+                <Switch.HiddenInput />
+                <Switch.Control />
+                <Switch.Label>
+                  <Stack gap="0">
+                    <Text fontSize="sm" fontWeight="medium">
+                      Optimiser la lecture
+                    </Text>
+                    <Text fontSize="xs" color="fg.muted">
+                      Convertit les pages en images à l&apos;enregistrement : le lecteur se charge plus vite.
+                    </Text>
+                  </Stack>
+                </Switch.Label>
+              </Switch.Root>
+            )}
           </Stack>
 
           <Stack gap="4" {...card}>

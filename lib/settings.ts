@@ -1,10 +1,10 @@
-import { connection } from "next/server";
-import { cache } from "react";
+import { cacheLife, cacheTag } from "next/cache";
 import { db } from "./db";
 import { site } from "./site";
 import type { HeroSettings } from "./types";
 
 export const HERO_KEY = "hero";
+export const SETTINGS_TAG = "settings";
 
 export const heroDefaults: HeroSettings = {
   title: `${site.name},`,
@@ -13,8 +13,7 @@ export const heroDefaults: HeroSettings = {
   imageUrl: "",
 };
 
-export const getHeroSettings = cache(async (): Promise<HeroSettings> => {
-  await connection();
+export async function readHeroSettings(): Promise<HeroSettings> {
   const saved = await db().getSetting<Partial<HeroSettings>>(HERO_KEY);
   return {
     title: saved?.title || heroDefaults.title,
@@ -22,4 +21,11 @@ export const getHeroSettings = cache(async (): Promise<HeroSettings> => {
     description: saved?.description ?? heroDefaults.description,
     imageUrl: saved?.imageUrl ?? "",
   };
-});
+}
+
+export async function getHeroSettings(): Promise<HeroSettings> {
+  "use cache";
+  cacheLife("days");
+  cacheTag(SETTINGS_TAG);
+  return readHeroSettings();
+}

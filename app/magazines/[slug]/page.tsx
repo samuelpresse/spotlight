@@ -26,13 +26,22 @@ import { Cover } from "@/components/cover";
 import { MagazineViewer } from "@/components/viewer";
 import { isAdmin } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
-import { getMagazineBySlug } from "@/lib/queries";
+import { getMagazineBySlug, getPublishedMagazines } from "@/lib/queries";
+import type { Magazine } from "@/lib/types";
+
+const PLACEHOLDER_SLUG = "_";
+
+export async function generateStaticParams() {
+  const magazines = await getPublishedMagazines();
+  if (magazines.length === 0) return [{ slug: PLACEHOLDER_SLUG }];
+  return magazines.map((magazine) => ({ slug: magazine.slug }));
+}
 
 export async function generateMetadata({
   params,
 }: PageProps<"/magazines/[slug]">): Promise<Metadata> {
   const magazine = await getMagazineBySlug((await params).slug);
-  if (!magazine) return {};
+  if (!magazine?.isPublished) return {};
   return {
     title: magazine.title,
     description: magazine.description,
@@ -56,9 +65,53 @@ async function MagazineContent({
   slugPromise: Promise<string>;
 }) {
   const magazine = await getMagazineBySlug(await slugPromise);
-  const admin = await isAdmin();
-  if (!magazine || (!magazine.isPublished && !admin)) notFound();
+  if (!magazine) notFound();
+  if (!magazine.isPublished) return <DraftPreview magazine={magazine} />;
 
+  return (
+    <MagazineView
+      magazine={magazine}
+      adminActions={
+        <Suspense fallback={null}>
+          <AdminActions id={magazine.id} />
+        </Suspense>
+      }
+    />
+  );
+}
+
+async function DraftPreview({ magazine }: { magazine: Magazine }) {
+  if (!(await isAdmin())) notFound();
+  return (
+    <MagazineView
+      magazine={magazine}
+      adminActions={<EditButton id={magazine.id} />}
+    />
+  );
+}
+
+async function AdminActions({ id }: { id: number }) {
+  if (!(await isAdmin())) return null;
+  return <EditButton id={id} />;
+}
+
+function EditButton({ id }: { id: number }) {
+  return (
+    <Button asChild variant="outline" rounded="full" size="lg">
+      <NextLink href={`/admin/${id}`}>
+        <LuPencil /> Modifier
+      </NextLink>
+    </Button>
+  );
+}
+
+function MagazineView({
+  magazine,
+  adminActions,
+}: {
+  magazine: Magazine;
+  adminActions: React.ReactNode;
+}) {
   return (
     <Container maxW="7xl" py={{ base: "8", md: "12" }}>
       <Breadcrumb.Root mb="8" size="sm">
@@ -157,19 +210,18 @@ async function MagazineContent({
                 Lire maintenant <LuArrowDown />
               </a>
             </Button>
-            {admin && (
-              <Button asChild variant="outline" rounded="full" size="lg">
-                <NextLink href={`/admin/${magazine.id}`}>
-                  <LuPencil /> Modifier
-                </NextLink>
-              </Button>
-            )}
+            {adminActions}
           </HStack>
         </Stack>
       </Flex>
 
       <Box id="lecture" scrollMarginTop="20">
-        <MagazineViewer pdfUrl={magazine.pdfUrl} title={magazine.title} />
+        <MagazineViewer
+          pdfUrl={magazine.pdfUrl}
+          title={magazine.title}
+          pages={magazine.pages}
+          pageRatio={magazine.pageRatio}
+        />
       </Box>
 
       <Flex justify="center" mt="6">

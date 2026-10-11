@@ -11,12 +11,10 @@ import {
   Portal,
   Separator,
   Spinner,
-  Stack,
   Text,
 } from "@chakra-ui/react";
 import { createContext, forwardRef, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import HTMLFlipBook from "react-pageflip";
-import { Document, Page, pdfjs } from "react-pdf";
 import {
   LuChevronLeft,
   LuChevronRight,
@@ -29,11 +27,11 @@ import {
   LuZoomOut,
 } from "react-icons/lu";
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
-
 const RENDER_WINDOW = 4;
 const SPREAD_MIN_WIDTH = 720;
 const ZOOM_STEPS = [0.75, 1, 1.25, 1.5, 2, 2.5, 3];
+
+export type RenderPage = (index: number, width: number, dpr: number) => React.ReactNode;
 
 type FlipBookHandle = {
   pageFlip: () => {
@@ -44,28 +42,33 @@ type FlipBookHandle = {
   };
 };
 
-const ViewerContext = createContext({ current: 0, width: 0, dpr: 1 });
+type FlipbookProps = {
+  title: string;
+  downloadHref: string;
+  numPages: number;
+  ratio: number;
+  renderPage: RenderPage;
+  wrap?: (content: React.ReactNode) => React.ReactNode;
+};
+
+const ViewerContext = createContext<{ current: number; width: number; dpr: number; renderPage: RenderPage }>({
+  current: 0,
+  width: 0,
+  dpr: 1,
+  renderPage: () => null,
+});
 
 const FlipPage = forwardRef<HTMLDivElement, { index: number }>(function FlipPage({ index }, ref) {
-  const { current, width, dpr } = useContext(ViewerContext);
+  const { current, width, dpr, renderPage } = useContext(ViewerContext);
   const visible = Math.abs(index - current) <= RENDER_WINDOW;
   return (
     <div ref={ref} style={{ background: "white", overflow: "hidden" }}>
-      {visible && (
-        <Page
-          pageNumber={index + 1}
-          width={width}
-          devicePixelRatio={dpr}
-          renderTextLayer={false}
-          renderAnnotationLayer={false}
-          loading={<PageSpinner />}
-        />
-      )}
+      {visible && renderPage(index, width, dpr)}
     </div>
   );
 });
 
-function PageSpinner() {
+export function PageSpinner() {
   return (
     <Center h="full" minH="40" color="gray.400">
       <Spinner />
@@ -75,13 +78,11 @@ function PageSpinner() {
 
 const downloadUrl = (url: string) => (url.includes(".blob.vercel-storage.com") ? `${url}?download=1` : url);
 
-export default function MagazineViewer({ pdfUrl, title }: { pdfUrl: string; title: string }) {
+export function Flipbook({ title, downloadHref, numPages, ratio, renderPage, wrap }: FlipbookProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<FlipBookHandle>(null);
 
-  const [numPages, setNumPages] = useState(0);
-  const [ratio, setRatio] = useState(1.414);
   const [current, setCurrent] = useState(0);
   const [stage, setStage] = useState({ width: 0, height: 0 });
   const [fullscreen, setFullscreen] = useState(false);
@@ -154,8 +155,7 @@ export default function MagazineViewer({ pdfUrl, title }: { pdfUrl: string; titl
     return [left, left + 1].filter((p) => p < numPages);
   }, [spread, current, numPages]);
 
-  const pageLabel =
-    numPages === 0 ? "" : visiblePages.map((p) => p + 1).join("-") + ` / ${numPages}`;
+  const pageLabel = numPages === 0 ? "" : visiblePages.map((p) => p + 1).join("-") + ` / ${numPages}`;
 
   const shift = !spread
     ? 0
@@ -173,6 +173,59 @@ export default function MagazineViewer({ pdfUrl, title }: { pdfUrl: string; titl
 
   const atStart = current === 0;
   const atEnd = visiblePages[visiblePages.length - 1] >= numPages - 1;
+
+  const content = numPages > 0 && stage.width > 0 && (
+    <ViewerContext.Provider value={{ current, width: pageWidth, dpr, renderPage }}>
+      <Box
+        transform={`translateX(${shift}px)`}
+        transition="transform 0.5s ease"
+        filter="drop-shadow(0 20px 30px rgba(20, 10, 50, 0.25))"
+      >
+        <HTMLFlipBook
+          key={bookKey}
+          ref={bookRef}
+          className="magazine-book"
+          style={{}}
+          startPage={current}
+          size="fixed"
+          width={pageWidth}
+          height={pageHeight}
+          minWidth={pageWidth}
+          maxWidth={pageWidth}
+          minHeight={pageHeight}
+          maxHeight={pageHeight}
+          drawShadow
+          flippingTime={700}
+          usePortrait={!spread}
+          startZIndex={0}
+          autoSize
+          maxShadowOpacity={0.4}
+          showCover
+          mobileScrollSupport
+          clickEventForward
+          useMouseEvents
+          swipeDistance={30}
+          showPageCorners
+          disableFlipByClick={false}
+          renderOnlyPageLengthChange
+          onFlip={(e: { data: number }) => setCurrent(e.data)}
+        >
+          {pages}
+        </HTMLFlipBook>
+      </Box>
+
+      <ZoomDialog
+        open={zoomOpen}
+        onClose={() => setZoomOpen(false)}
+        pages={visiblePages}
+        zoom={zoom}
+        setZoom={setZoom}
+        container={rootRef}
+        title={title}
+        baseWidth={Math.min(stage.width, 900)}
+      />
+    </ViewerContext.Provider>
+  );
 
   return (
     <Box
@@ -200,7 +253,7 @@ export default function MagazineViewer({ pdfUrl, title }: { pdfUrl: string; titl
       >
         <HStack gap="1">
           <IconButton asChild aria-label="Télécharger le PDF" variant="ghost" size="sm" colorPalette="gray">
-            <a href={downloadUrl(pdfUrl)} download target="_blank" rel="noopener">
+            <a href={downloadUrl(downloadHref)} download target="_blank" rel="noopener">
               <LuDownload />
             </a>
           </IconButton>
@@ -218,19 +271,51 @@ export default function MagazineViewer({ pdfUrl, title }: { pdfUrl: string; titl
         </HStack>
 
         <HStack gap="1">
-          <IconButton aria-label="Première page" variant="ghost" size="sm" colorPalette="gray" onClick={() => goTo(0)} disabled={atStart} display={{ base: "none", sm: "inline-flex" }}>
+          <IconButton
+            aria-label="Première page"
+            variant="ghost"
+            size="sm"
+            colorPalette="gray"
+            onClick={() => goTo(0)}
+            disabled={atStart}
+            display={{ base: "none", sm: "inline-flex" }}
+          >
             <LuChevronsLeft />
           </IconButton>
-          <IconButton aria-label="Page précédente" variant="outline" size="sm" rounded="full" colorPalette="gray" onClick={flipPrev} disabled={atStart}>
+          <IconButton
+            aria-label="Page précédente"
+            variant="outline"
+            size="sm"
+            rounded="full"
+            colorPalette="gray"
+            onClick={flipPrev}
+            disabled={atStart}
+          >
             <LuChevronLeft />
           </IconButton>
           <Text fontSize="sm" fontWeight="medium" minW="20" textAlign="center" fontVariantNumeric="tabular-nums">
             {pageLabel && `Page ${pageLabel}`}
           </Text>
-          <IconButton aria-label="Page suivante" variant="outline" size="sm" rounded="full" colorPalette="gray" onClick={flipNext} disabled={atEnd}>
+          <IconButton
+            aria-label="Page suivante"
+            variant="outline"
+            size="sm"
+            rounded="full"
+            colorPalette="gray"
+            onClick={flipNext}
+            disabled={atEnd}
+          >
             <LuChevronRight />
           </IconButton>
-          <IconButton aria-label="Dernière page" variant="ghost" size="sm" colorPalette="gray" onClick={() => goTo(numPages - 1)} disabled={atEnd} display={{ base: "none", sm: "inline-flex" }}>
+          <IconButton
+            aria-label="Dernière page"
+            variant="ghost"
+            size="sm"
+            colorPalette="gray"
+            onClick={() => goTo(numPages - 1)}
+            disabled={atEnd}
+            display={{ base: "none", sm: "inline-flex" }}
+          >
             <LuChevronsRight />
           </IconButton>
         </HStack>
@@ -257,79 +342,7 @@ export default function MagazineViewer({ pdfUrl, title }: { pdfUrl: string; titl
         justifyContent="center"
         overflow="hidden"
       >
-        <Document
-          file={pdfUrl}
-          onLoadSuccess={async (pdf) => {
-            const first = await pdf.getPage(1);
-            const viewport = first.getViewport({ scale: 1 });
-            setRatio(viewport.height / viewport.width);
-            setNumPages(pdf.numPages);
-          }}
-          loading={
-            <Stack align="center" gap="3" color="fg.muted">
-              <Spinner size="lg" color="brand.solid" />
-              <Text fontSize="sm">Chargement du magazine…</Text>
-            </Stack>
-          }
-          error={
-            <Text fontSize="sm" color="red.500" textAlign="center" px="4">
-              Impossible de charger le magazine. Essaie de télécharger le PDF.
-            </Text>
-          }
-        >
-          {numPages > 0 && stage.width > 0 && (
-            <ViewerContext.Provider value={{ current, width: pageWidth, dpr }}>
-              <Box
-                transform={`translateX(${shift}px)`}
-                transition="transform 0.5s ease"
-                filter="drop-shadow(0 20px 30px rgba(20, 10, 50, 0.25))"
-              >
-                <HTMLFlipBook
-                  key={bookKey}
-                  ref={bookRef}
-                  className="magazine-book"
-                  style={{}}
-                  startPage={current}
-                  size="fixed"
-                  width={pageWidth}
-                  height={pageHeight}
-                  minWidth={pageWidth}
-                  maxWidth={pageWidth}
-                  minHeight={pageHeight}
-                  maxHeight={pageHeight}
-                  drawShadow
-                  flippingTime={700}
-                  usePortrait={!spread}
-                  startZIndex={0}
-                  autoSize
-                  maxShadowOpacity={0.4}
-                  showCover
-                  mobileScrollSupport
-                  clickEventForward
-                  useMouseEvents
-                  swipeDistance={30}
-                  showPageCorners
-                  disableFlipByClick={false}
-                  renderOnlyPageLengthChange
-                  onFlip={(e: { data: number }) => setCurrent(e.data)}
-                >
-                  {pages}
-                </HTMLFlipBook>
-              </Box>
-
-              <ZoomDialog
-                open={zoomOpen}
-                onClose={() => setZoomOpen(false)}
-                pages={visiblePages}
-                zoom={zoom}
-                setZoom={setZoom}
-                container={rootRef}
-                title={title}
-                baseWidth={Math.min(stage.width, 900)}
-              />
-            </ViewerContext.Provider>
-          )}
-        </Document>
+        {wrap ? wrap(content) : content}
       </Box>
     </Box>
   );
@@ -354,7 +367,7 @@ function ZoomDialog({
   title: string;
   baseWidth: number;
 }) {
-  const { dpr } = useContext(ViewerContext);
+  const { dpr, renderPage } = useContext(ViewerContext);
   const index = ZOOM_STEPS.indexOf(zoom);
   const width = Math.round((baseWidth / pages.length) * zoom);
 
@@ -369,13 +382,29 @@ function ZoomDialog({
                 {title} — page {pages.map((p) => p + 1).join("-")}
               </Dialog.Title>
               <HStack gap="1">
-                <IconButton aria-label="Dézoomer" size="sm" variant="ghost" color="white" _hover={{ bg: "whiteAlpha.200" }} disabled={index <= 0} onClick={() => setZoom(ZOOM_STEPS[index - 1])}>
+                <IconButton
+                  aria-label="Dézoomer"
+                  size="sm"
+                  variant="ghost"
+                  color="white"
+                  _hover={{ bg: "whiteAlpha.200" }}
+                  disabled={index <= 0}
+                  onClick={() => setZoom(ZOOM_STEPS[index - 1])}
+                >
                   <LuZoomOut />
                 </IconButton>
                 <Text fontSize="sm" minW="12" textAlign="center">
                   {Math.round(zoom * 100)}%
                 </Text>
-                <IconButton aria-label="Zoomer" size="sm" variant="ghost" color="white" _hover={{ bg: "whiteAlpha.200" }} disabled={index >= ZOOM_STEPS.length - 1} onClick={() => setZoom(ZOOM_STEPS[index + 1])}>
+                <IconButton
+                  aria-label="Zoomer"
+                  size="sm"
+                  variant="ghost"
+                  color="white"
+                  _hover={{ bg: "whiteAlpha.200" }}
+                  disabled={index >= ZOOM_STEPS.length - 1}
+                  onClick={() => setZoom(ZOOM_STEPS[index + 1])}
+                >
                   <LuZoomIn />
                 </IconButton>
                 <Dialog.CloseTrigger asChild position="static">
@@ -388,14 +417,7 @@ function ZoomDialog({
                 {open &&
                   pages.map((p) => (
                     <Box key={p} bg="white" shadow="2xl">
-                      <Page
-                        pageNumber={p + 1}
-                        width={width}
-                        devicePixelRatio={dpr}
-                        renderTextLayer={false}
-                        renderAnnotationLayer={false}
-                        loading={<PageSpinner />}
-                      />
+                      {renderPage(p, width, dpr)}
                     </Box>
                   ))}
               </Flex>

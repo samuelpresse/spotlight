@@ -1,11 +1,26 @@
-import { Badge, Box, Button, Container, Flex, Heading, HStack, Stack, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  Container,
+  Flex,
+  Heading,
+  HStack,
+  Stack,
+  Text,
+} from "@chakra-ui/react";
 import { LuMessageSquare, LuSparkles } from "react-icons/lu";
 import { site } from "@/lib/site";
 import { Fireflies } from "./fireflies";
 
 export function LuciolesBanner() {
   return (
-    <Container id="lucioles" scrollMarginTop="24" maxW="7xl" mt={{ base: "16", md: "24" }}>
+    <Container
+      id="lucioles"
+      scrollMarginTop="24"
+      maxW="7xl"
+      mt={{ base: "16", md: "24" }}
+    >
       <Box
         position="relative"
         overflow="hidden"
@@ -29,19 +44,6 @@ export function LuciolesBanner() {
           gap="8"
         >
           <Stack gap="4" maxW="2xl">
-            <Badge
-              rounded="full"
-              px="3"
-              py="1"
-              size="lg"
-              w="fit-content"
-              bg="whiteAlpha.100"
-              color="silver.100"
-              borderWidth="1px"
-              borderColor="whiteAlpha.200"
-            >
-              <LuSparkles /> Les Lucioles
-            </Badge>
             <Heading
               as="h2"
               fontSize={{ base: "3xl", md: "4xl" }}
@@ -53,8 +55,9 @@ export function LuciolesBanner() {
               Deviens une Luciole
             </Heading>
             <Text fontSize={{ base: "md", md: "lg" }} color="silver.200">
-              Devenez l&apos;une de nos Lucioles en nous délivrant les nouvelles les plus récentes ou en primeur sur
-              vos Vtubers francophones préférés.
+              Devenez l&apos;une de nos Lucioles en nous délivrant les nouvelles
+              les plus récentes ou en primeur sur vos Vtubers francophones
+              préférés.
             </Text>
             <Text fontSize={{ base: "md", md: "lg" }} color="silver.200">
               Peut-être que votre annonce sera mise en lumière dans la chronique{" "}
@@ -65,8 +68,20 @@ export function LuciolesBanner() {
             </Text>
           </Stack>
           <HStack gap="3" flexWrap="wrap" flexShrink={0}>
-            <Button asChild size="lg" rounded="full" bg="silver.100" color="night.900" _hover={{ bg: "white" }} shadow="lg">
-              <a href={site.newsFormUrl} target="_blank" rel="noopener noreferrer">
+            <Button
+              asChild
+              size="lg"
+              rounded="full"
+              bg="silver.100"
+              color="night.900"
+              _hover={{ bg: "white" }}
+              shadow="lg"
+            >
+              <a
+                href={site.newsFormUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <LuMessageSquare /> Rejoins les Lucioles
               </a>
             </Button>

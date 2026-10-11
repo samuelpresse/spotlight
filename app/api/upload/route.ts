@@ -1,4 +1,10 @@
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { issueSignedToken } from "@vercel/blob";
+import {
+  handleUpload,
+  handleUploadPresigned,
+  type HandleUploadBody,
+  type HandleUploadPresignedBody,
+} from "@vercel/blob/client";
 import { randomBytes } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
@@ -26,6 +32,32 @@ export async function POST(request: Request) {
             allowedContentTypes: ALLOWED_CONTENT_TYPES,
             maximumSizeInBytes: MAX_UPLOAD_BYTES,
             addRandomSuffix: true,
+          };
+        },
+      });
+      return NextResponse.json(json);
+    } catch (err) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+    }
+  }
+
+  if (storageMode === "blob-oidc") {
+    const body = (await request.json()) as HandleUploadPresignedBody;
+    try {
+      const json = await handleUploadPresigned({
+        body,
+        request,
+        getSignedToken: async (pathname) => {
+          if (!(await isAdmin())) throw new Error("Non autorisé");
+          const token = await issueSignedToken({
+            pathname,
+            operations: ["put"],
+            allowedContentTypes: ALLOWED_CONTENT_TYPES,
+            maximumSizeInBytes: MAX_UPLOAD_BYTES,
+          });
+          return {
+            token,
+            urlOptions: { allowedContentTypes: ALLOWED_CONTENT_TYPES, maximumSizeInBytes: MAX_UPLOAD_BYTES },
           };
         },
       });

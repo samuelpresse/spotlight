@@ -29,6 +29,8 @@ type Row = {
   cover_url: string;
   pdf_url: string;
   page_count: number;
+  pages: string[] | null;
+  page_ratio: number | null;
   published_at: string;
   is_published: boolean;
   created_at: string;
@@ -44,6 +46,8 @@ const toMagazine = (r: Row): Magazine => ({
   coverUrl: r.cover_url,
   pdfUrl: r.pdf_url,
   pageCount: r.page_count,
+  pages: Array.isArray(r.pages) ? r.pages : [],
+  pageRatio: Number(r.page_ratio) || 0,
   publishedAt: r.published_at,
   isPublished: r.is_published,
   createdAt: r.created_at,
@@ -78,12 +82,14 @@ function postgresRepo(url: string): Repo {
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
           )`
       )
+      .then(() => sql`ALTER TABLE magazines ADD COLUMN IF NOT EXISTS pages JSONB NOT NULL DEFAULT '[]'`)
+      .then(() => sql`ALTER TABLE magazines ADD COLUMN IF NOT EXISTS page_ratio REAL NOT NULL DEFAULT 0`)
       .catch((err) => {
-      ready = null;
-      throw err;
-    }));
+        ready = null;
+        throw err;
+      }));
 
-  const columns = sql.unsafe(`id, slug, title, issue, description, cover_url, pdf_url, page_count,
+  const columns = sql.unsafe(`id, slug, title, issue, description, cover_url, pdf_url, page_count, pages, page_ratio,
     to_char(published_at, 'YYYY-MM-DD') AS published_at, is_published,
     created_at::text AS created_at, updated_at::text AS updated_at`);
 
@@ -116,8 +122,9 @@ function postgresRepo(url: string): Repo {
     async create(m) {
       await init();
       const created = await one(sql`
-        INSERT INTO magazines (slug, title, issue, description, cover_url, pdf_url, page_count, published_at, is_published)
-        VALUES (${m.slug}, ${m.title}, ${m.issue}, ${m.description}, ${m.coverUrl}, ${m.pdfUrl}, ${m.pageCount}, ${m.publishedAt}, ${m.isPublished})
+        INSERT INTO magazines (slug, title, issue, description, cover_url, pdf_url, page_count, pages, page_ratio, published_at, is_published)
+        VALUES (${m.slug}, ${m.title}, ${m.issue}, ${m.description}, ${m.coverUrl}, ${m.pdfUrl}, ${m.pageCount},
+          ${JSON.stringify(m.pages)}::jsonb, ${m.pageRatio}, ${m.publishedAt}, ${m.isPublished})
         RETURNING ${columns}`);
       return created!;
     },
@@ -127,6 +134,7 @@ function postgresRepo(url: string): Repo {
         UPDATE magazines SET
           slug = ${m.slug}, title = ${m.title}, issue = ${m.issue}, description = ${m.description},
           cover_url = ${m.coverUrl}, pdf_url = ${m.pdfUrl}, page_count = ${m.pageCount},
+          pages = ${JSON.stringify(m.pages)}::jsonb, page_ratio = ${m.pageRatio},
           published_at = ${m.publishedAt}, is_published = ${m.isPublished}, updated_at = now()
         WHERE id = ${id}
         RETURNING ${columns}`);
@@ -158,7 +166,9 @@ function localRepo(): Repo {
 
   const read = async (): Promise<LocalData> => {
     try {
-      return JSON.parse(await fs.readFile(file, "utf8"));
+      const data: LocalData = JSON.parse(await fs.readFile(file, "utf8"));
+      data.magazines = data.magazines.map((m) => ({ ...m, pages: m.pages ?? [], pageRatio: m.pageRatio ?? 0 }));
+      return data;
     } catch {
       return { nextId: 1, magazines: [] };
     }

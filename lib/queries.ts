@@ -1,13 +1,18 @@
-import { connection } from "next/server";
-import { cache } from "react";
+import { cacheLife, cacheTag } from "next/cache";
 import { db } from "./db";
 
-export const getPublishedMagazines = cache(async () => {
-  await connection();
-  return db().list();
-});
+export const MAGAZINES_TAG = "magazines";
 
-export const getMagazineBySlug = cache(async (slug: string) => {
-  await connection();
+export async function getPublishedMagazines() {
+  "use cache";
+  cacheLife("days");
+  cacheTag(MAGAZINES_TAG);
+  return db().list();
+}
+
+export async function getMagazineBySlug(slug: string) {
+  "use cache";
+  cacheLife("days");
+  cacheTag(MAGAZINES_TAG);
   return db().getBySlug(slug);
-});
+}

@@ -1,7 +1,7 @@
 import { Container, Skeleton, Stack } from "@chakra-ui/react";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
-import { getHeroSettings, heroDefaults } from "@/lib/settings";
+import { heroDefaults, readHeroSettings } from "@/lib/settings";
 import { storageMode } from "@/lib/storage";
 import { AdminHeader } from "../admin-header";
 import { HeroForm } from "./hero-form";
@@ -23,6 +23,6 @@ export default function AdminHomeSettingsPage() {
 
 async function ProtectedHeroForm() {
   await requireAdmin();
-  const hero = await getHeroSettings();
+  const hero = await readHeroSettings();
   return <HeroForm initial={hero} defaults={heroDefaults} storageMode={storageMode} />;
 }

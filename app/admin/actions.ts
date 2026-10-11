@@ -1,11 +1,12 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { requireAdmin, signIn, signOut, adminPasswordConfigured } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { slugify } from "@/lib/format";
 import { deleteFiles, LOCAL_FILE_PREFIX } from "@/lib/storage";
-import { getHeroSettings, HERO_KEY } from "@/lib/settings";
+import { MAGAZINES_TAG } from "@/lib/queries";
+import { HERO_KEY, readHeroSettings, SETTINGS_TAG } from "@/lib/settings";
 import type { HeroSettings, MagazineInput } from "@/lib/types";
 
 export type ActionResult = { ok: true; slug: string } | { ok: false; error: string };
@@ -28,6 +29,8 @@ export async function logoutAction() {
 
 
 const isFileUrl = (url: string) => url.startsWith(LOCAL_FILE_PREFIX) || url.startsWith("https://");
+const MAX_PAGES = 300;
+const validRatio = (ratio: number) => (Number.isFinite(ratio) && ratio > 0.2 && ratio < 5 ? ratio : 0);
 const isDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
 
 function validate(raw: MagazineInput): { data: MagazineInput } | { error: string } {
@@ -39,6 +42,8 @@ function validate(raw: MagazineInput): { data: MagazineInput } | { error: string
     coverUrl: String(raw.coverUrl ?? ""),
     pdfUrl: String(raw.pdfUrl ?? ""),
     pageCount: Math.max(0, Math.floor(Number(raw.pageCount) || 0)),
+    pages: Array.isArray(raw.pages) ? raw.pages.map(String).filter(isFileUrl).slice(0, MAX_PAGES) : [],
+    pageRatio: validRatio(Number(raw.pageRatio)),
     publishedAt: String(raw.publishedAt ?? ""),
     isPublished: Boolean(raw.isPublished),
   };
@@ -73,9 +78,11 @@ export async function saveMagazine(id: number | null, input: MagazineInput): Pro
       const previous = await db().getById(id);
       if (!previous) return { ok: false, error: "Ce magazine n'existe plus." };
       await db().update(id, data);
+      const keptPages = new Set(data.pages);
       await deleteFiles([
         previous.pdfUrl !== data.pdfUrl ? previous.pdfUrl : null,
         previous.coverUrl !== data.coverUrl ? previous.coverUrl : null,
+        ...previous.pages.filter((url) => !keptPages.has(url)),
       ]);
     }
   } catch (err) {
@@ -83,6 +90,7 @@ export async function saveMagazine(id: number | null, input: MagazineInput): Pro
     return { ok: false, error: "Erreur lors de l'enregistrement dans la base de données." };
   }
 
+  updateTag(MAGAZINES_TAG);
   revalidatePath("/", "layout");
   return { ok: true, slug: data.slug };
 }
@@ -92,7 +100,8 @@ export async function deleteMagazine(id: number): Promise<ActionResult> {
   try {
     const removed = await db().remove(id);
     if (!removed) return { ok: false, error: "Ce magazine n'existe plus." };
-    await deleteFiles([removed.pdfUrl, removed.coverUrl]);
+    await deleteFiles([removed.pdfUrl, removed.coverUrl, ...removed.pages]);
+    updateTag(MAGAZINES_TAG);
     revalidatePath("/", "layout");
     return { ok: true, slug: removed.slug };
   } catch (err) {
@@ -115,7 +124,7 @@ export async function saveHeroSettings(input: HeroSettings): Promise<{ ok: true 
   if (data.imageUrl && !isFileUrl(data.imageUrl)) return { ok: false, error: "L'URL de l'image est invalide." };
 
   try {
-    const previous = await getHeroSettings();
+    const previous = await readHeroSettings();
     await db().setSetting(HERO_KEY, data);
     if (previous.imageUrl && previous.imageUrl !== data.imageUrl) await deleteFiles([previous.imageUrl]);
   } catch (err) {
@@ -123,6 +132,7 @@ export async function saveHeroSettings(input: HeroSettings): Promise<{ ok: true 
     return { ok: false, error: "Erreur lors de l'enregistrement dans la base de données." };
   }
 
+  updateTag(SETTINGS_TAG);
   revalidatePath("/", "layout");
   return { ok: true };
 }

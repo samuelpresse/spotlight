@@ -7,6 +7,8 @@ export type Magazine = {
   coverUrl: string;
   pdfUrl: string;
   pageCount: number;
+  pages: string[];
+  pageRatio: number;
   publishedAt: string;
   isPublished: boolean;
   createdAt: string;

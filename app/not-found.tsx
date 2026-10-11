@@ -9,7 +9,7 @@ export default function NotFound() {
           404
         </Text>
         <Heading>Page introuvable</Heading>
-        <Text color="fg.muted">Ce magazine n&apos;existe pas ou n&apos;est plus disponible.</Text>
+        <Text color="fg.muted">Cette page n&apos;existe pas ou n&apos;est plus disponible.</Text>
         <Button asChild colorPalette="brand" rounded="full">
           <NextLink href="/">Retour à l&apos;accueil</NextLink>
         </Button>

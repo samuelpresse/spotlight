@@ -2,7 +2,13 @@ import { del } from "@vercel/blob";
 import { promises as fs } from "fs";
 import path from "path";
 
-export const storageMode: "blob" | "local" = process.env.BLOB_READ_WRITE_TOKEN ? "blob" : "local";
+export type StorageMode = "blob" | "blob-oidc" | "local";
+
+export const storageMode: StorageMode = process.env.BLOB_READ_WRITE_TOKEN
+  ? "blob"
+  : process.env.BLOB_STORE_ID
+    ? "blob-oidc"
+    : "local";
 
 export const LOCAL_UPLOAD_DIR = path.join(process.cwd(), ".data", "uploads");
 export const LOCAL_FILE_PREFIX = "/api/files/";
@@ -14,7 +20,7 @@ export async function deleteFiles(urls: (string | null | undefined)[]) {
   const targets = urls.filter((u): u is string => !!u);
   if (targets.length === 0) return;
 
-  if (storageMode === "blob") {
+  if (storageMode !== "local") {
     const blobUrls = targets.filter((u) => u.includes(".blob.vercel-storage.com"));
     if (blobUrls.length) await del(blobUrls).catch(() => {});
     return;

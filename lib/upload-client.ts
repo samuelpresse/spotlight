@@ -1,6 +1,14 @@
-import { upload } from "@vercel/blob/client";
+import { upload, uploadPresigned } from "@vercel/blob/client";
 
-export type StorageMode = "blob" | "local";
+export type StorageMode = "blob" | "blob-oidc" | "local";
+
+const MULTIPART_THRESHOLD = 8 * 1024 * 1024;
+
+const uniquePath = (file: File) => {
+  const id = Math.random().toString(36).slice(2, 10);
+  const name = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
+  return `magazines/${id}-${name}`;
+};
 
 export async function uploadFile(
   file: File,
@@ -12,7 +20,18 @@ export async function uploadFile(
       access: "public",
       handleUploadUrl: "/api/upload",
       contentType: file.type,
-      multipart: file.size > 8 * 1024 * 1024,
+      multipart: file.size > MULTIPART_THRESHOLD,
+      onUploadProgress: ({ percentage }) => onProgress?.(percentage),
+    });
+    return blob.url;
+  }
+
+  if (mode === "blob-oidc") {
+    const blob = await uploadPresigned(uniquePath(file), file, {
+      access: "public",
+      handleUploadUrl: "/api/upload",
+      contentType: file.type,
+      multipart: file.size > MULTIPART_THRESHOLD,
       onUploadProgress: ({ percentage }) => onProgress?.(percentage),
     });
     return blob.url;
@@ -32,4 +51,24 @@ export async function uploadFile(
     xhr.onerror = () => reject(new Error("Erreur réseau pendant l'envoi"));
     xhr.send(body);
   });
+}
+
+export async function uploadFiles(
+  files: File[],
+  mode: StorageMode,
+  onProgress?: (done: number, total: number) => void,
+  concurrency = 4
+): Promise<string[]> {
+  const urls = new Array<string>(files.length);
+  let next = 0;
+  let done = 0;
+  const worker = async () => {
+    while (next < files.length) {
+      const index = next++;
+      urls[index] = await uploadFile(files[index], mode);
+      onProgress?.(++done, files.length);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, worker));
+  return urls;
 }
