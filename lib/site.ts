@@ -9,10 +9,10 @@ export const site = {
   newsFormUrl:
     "https://docs.google.com/forms/d/e/1FAIpQLSfrgol9t1JKZL4UCU9eT_d5WasDFKWx-_wJznLuoDo3qb9MzA/viewform",
   socials: {
-    x: "https://x.com/",
-    twitch: "https://www.twitch.tv/",
-    instagram: "https://www.instagram.com/",
-    tiktok: "https://www.tiktok.com/",
-    email: "contact@exemple.com",
+    x: "https://x.com/Skinekko",
+    twitch: "https://www.twitch.tv/skinekko",
+    instagram: "https://www.instagram.com/skinekko/",
+    tiktok: "https://www.tiktok.com/@skinekko",
+    email: "skinwalkersvt@gmail.com",
   },
 };
