@@ -34,7 +34,9 @@ import { checkSlugAvailable, saveMagazine } from "./actions";
 type Props = { magazine?: Magazine; storageMode: StorageMode };
 
 const formatSize = (bytes: number) =>
-  bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)} Ko` : `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
+  bytes < 1024 * 1024
+    ? `${Math.ceil(bytes / 1024)} Ko`
+    : `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
 
 const card = {
   bg: "surface",
@@ -55,7 +57,11 @@ export function MagazineForm(props: Props) {
   );
 }
 
-function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSaved: () => void }) {
+function MagazineFormFields({
+  magazine,
+  storageMode,
+  onSaved,
+}: Props & { onSaved: () => void }) {
   const router = useRouter();
   const editing = !!magazine;
 
@@ -64,15 +70,23 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
   const [slugTouched, setSlugTouched] = useState(editing);
   const [issue, setIssue] = useState(magazine?.issue ?? "");
   const [description, setDescription] = useState(magazine?.description ?? "");
-  const [publishedAt, setPublishedAt] = useState(magazine?.publishedAt ?? today());
+  const [publishedAt, setPublishedAt] = useState(
+    magazine?.publishedAt ?? today(),
+  );
   const [isPublished, setIsPublished] = useState(magazine?.isPublished ?? true);
 
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [pdfInfo, setPdfInfo] = useState<{ pageCount: number; cover: File } | null>(null);
+  const [pdfInfo, setPdfInfo] = useState<{
+    pageCount: number;
+    cover: File;
+  } | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [customCover, setCustomCover] = useState<File | null>(null);
 
-  const [progress, setProgress] = useState<{ label: string; percent: number } | null>(null);
+  const [progress, setProgress] = useState<{
+    label: string;
+    percent: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -82,8 +96,14 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
   const effectiveSlug = slugTouched ? slug : slugify(title);
   const coverFile = customCover ?? pdfInfo?.cover ?? null;
 
-  const coverPreview = useMemo(() => (coverFile ? URL.createObjectURL(coverFile) : null), [coverFile]);
-  useEffect(() => () => void (coverPreview && URL.revokeObjectURL(coverPreview)), [coverPreview]);
+  const coverPreview = useMemo(
+    () => (coverFile ? URL.createObjectURL(coverFile) : null),
+    [coverFile],
+  );
+  useEffect(
+    () => () => void (coverPreview && URL.revokeObjectURL(coverPreview)),
+    [coverPreview],
+  );
 
   const pageCount = pdfInfo?.pageCount ?? magazine?.pageCount ?? 0;
   const isLegacy = editing && (magazine?.pages.length ?? 0) === 0;
@@ -119,14 +139,17 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
 
     if (!title.trim()) return setError("Le titre est obligatoire.");
     if (!effectiveSlug) return setError("L'adresse (slug) est invalide.");
-    if (!editing && !pdfFile) return setError("Ajoute le fichier PDF du magazine.");
+    if (!editing && !pdfFile)
+      return setError("Ajoute le fichier PDF du magazine.");
     if (analyzing) return setError("Patiente pendant l'analyse du PDF…");
 
     try {
       setProgress({ label: "Vérification…", percent: 0 });
       if (!(await checkSlugAvailable(effectiveSlug, magazine?.id))) {
         setProgress(null);
-        return setError(`L'adresse « ${effectiveSlug} » est déjà utilisée. Choisis-en une autre.`);
+        return setError(
+          `L'adresse « ${effectiveSlug} » est déjà utilisée. Choisis-en une autre.`,
+        );
       }
 
       let pageFiles: File[] = [];
@@ -134,8 +157,14 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
       const pdfSource = pdfFile ?? (convertLegacy ? magazine?.pdfUrl : null);
       if (pdfSource) {
         const { renderPdfPages } = await import("@/lib/pdf-client");
-        const rendered = await renderPdfPages(pdfSource, effectiveSlug, (done, total) =>
-          setProgress({ label: `Préparation des pages… ${done}/${total}`, percent: (done / total) * 100 })
+        const rendered = await renderPdfPages(
+          pdfSource,
+          effectiveSlug,
+          (done, total) =>
+            setProgress({
+              label: `Préparation des pages… ${done}/${total}`,
+              percent: (done / total) * 100,
+            }),
         );
         pageFiles = rendered.pages;
         pageRatio = rendered.ratio;
@@ -144,21 +173,24 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
       let pdfUrl = magazine?.pdfUrl ?? "";
       if (pdfFile) {
         pdfUrl = await uploadFile(pdfFile, storageMode, (percent) =>
-          setProgress({ label: "Envoi du PDF…", percent })
+          setProgress({ label: "Envoi du PDF…", percent }),
         );
       }
 
       let pages = magazine?.pages ?? [];
       if (pageFiles.length > 0) {
         pages = await uploadFiles(pageFiles, storageMode, (done, total) =>
-          setProgress({ label: `Envoi des pages… ${done}/${total}`, percent: (done / total) * 100 })
+          setProgress({
+            label: `Envoi des pages… ${done}/${total}`,
+            percent: (done / total) * 100,
+          }),
         );
       }
 
       let coverUrl = magazine?.coverUrl ?? "";
       if (coverFile) {
         coverUrl = await uploadFile(coverFile, storageMode, (percent) =>
-          setProgress({ label: "Envoi de la couverture…", percent })
+          setProgress({ label: "Envoi de la couverture…", percent }),
         );
       }
 
@@ -181,7 +213,10 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
         setProgress(null);
         return setError(result.error);
       }
-      toaster.create({ type: "success", title: editing ? "Magazine mis à jour." : "Magazine publié !" });
+      toaster.create({
+        type: "success",
+        title: editing ? "Magazine mis à jour." : "Magazine publié !",
+      });
       onSaved();
       router.push("/admin");
       router.refresh();
@@ -194,7 +229,11 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
 
   return (
     <form onSubmit={handleSubmit}>
-      <Grid templateColumns={{ base: "1fr", lg: "1fr 380px" }} gap="6" alignItems="start">
+      <Grid
+        templateColumns={{ base: "1fr", lg: "1fr 380px" }}
+        gap="6"
+        alignItems="start"
+      >
         <Stack gap="6" {...card}>
           <Heading size="lg">Informations</Heading>
 
@@ -202,21 +241,33 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
             <Field.Label>
               Titre <Field.RequiredIndicator />
             </Field.Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Spotlight Volume 5" size="lg" />
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Spotlight Volume 5"
+              size="lg"
+            />
           </Field.Root>
 
           <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap="6">
             <Field.Root>
               <Field.Label>Numéro / édition</Field.Label>
-              <Input value={issue} onChange={(e) => setIssue(e.target.value)} placeholder="#5, Juin, Spécial…" maxLength={20} />
-              <Field.HelperText>Affiché en grand sur la couverture du catalogue.</Field.HelperText>
+              <Input
+                value={issue}
+                onChange={(e) => setIssue(e.target.value)}
+                placeholder="#5, Juin, Spécial…"
+                maxLength={20}
+              />
             </Field.Root>
             <Field.Root required>
               <Field.Label>
                 Date de parution <Field.RequiredIndicator />
               </Field.Label>
-              <Input type="date" value={publishedAt} onChange={(e) => setPublishedAt(e.target.value)} />
-              <Field.HelperText>Le catalogue est trié par cette date.</Field.HelperText>
+              <Input
+                type="date"
+                value={publishedAt}
+                onChange={(e) => setPublishedAt(e.target.value)}
+              />
             </Field.Root>
           </Grid>
 
@@ -233,7 +284,9 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
                 placeholder="spotlight-volume-5"
               />
             </InputGroup>
-            <Field.HelperText>Générée automatiquement à partir du titre.</Field.HelperText>
+            <Field.HelperText>
+              Générée automatiquement à partir du titre.
+            </Field.HelperText>
           </Field.Root>
 
           <Field.Root>
@@ -241,7 +294,7 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Au sommaire de ce numéro…"
+              placeholder="Description du magazine…"
               rows={5}
               autoresize
               maxLength={2000}
@@ -251,7 +304,14 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
 
         <Stack gap="6" position={{ lg: "sticky" }} top={{ lg: "24" }}>
           <Stack gap="4" {...card}>
-            <Heading size="md">Fichier PDF {!editing && <Text as="span" color="red.500">*</Text>}</Heading>
+            <Heading size="md">
+              Fichier PDF{" "}
+              {!editing && (
+                <Text as="span" color="red.500">
+                  *
+                </Text>
+              )}
+            </Heading>
             <chakra.button
               type="button"
               onClick={() => pdfInput.current?.click()}
@@ -278,9 +338,17 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
               disabled={saving}
             >
               <Stack align="center" gap="2">
-                {analyzing ? <Spinner color="brand.solid" /> : <Icon as={LuFileUp} boxSize="7" color="brand.fg" />}
+                {analyzing ? (
+                  <Spinner color="brand.solid" />
+                ) : (
+                  <Icon as={LuFileUp} boxSize="7" color="brand.fg" />
+                )}
                 <Text fontWeight="medium" fontSize="sm" wordBreak="break-all">
-                  {pdfFile ? pdfFile.name : editing ? "Remplacer le PDF (optionnel)" : "Glisse ton PDF ici ou clique pour choisir"}
+                  {pdfFile
+                    ? pdfFile.name
+                    : editing
+                      ? "Remplacer le PDF (optionnel)"
+                      : "Glisse ton PDF ici ou clique pour choisir"}
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
                   {analyzing
@@ -289,7 +357,7 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
                       ? `${formatSize(pdfFile.size)} · ${pageCount} pages`
                       : editing
                         ? `PDF actuel : ${pageCount} pages`
-                        : "Idéalement 25 à 30 pages"}
+                        : "PDF requis pour créer le magazine"}
                 </Text>
               </Stack>
             </chakra.button>
@@ -319,7 +387,8 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
                       Optimiser la lecture
                     </Text>
                     <Text fontSize="xs" color="fg.muted">
-                      Convertit les pages en images à l&apos;enregistrement : le lecteur se charge plus vite.
+                      Convertit les pages en images à l&apos;enregistrement : le
+                      lecteur se charge plus vite.
                     </Text>
                   </Stack>
                 </Switch.Label>
@@ -329,11 +398,32 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
 
           <Stack gap="4" {...card}>
             <Heading size="md">Couverture</Heading>
-            <Box rounded="xl" overflow="hidden" bg="brand.subtle" aspectRatio={3 / 4} maxW="56" mx="auto" w="full" shadow="md">
+            <Box
+              rounded="xl"
+              overflow="hidden"
+              bg="brand.subtle"
+              aspectRatio={3 / 4}
+              maxW="56"
+              mx="auto"
+              w="full"
+              shadow="md"
+            >
               {coverPreview || magazine?.coverUrl ? (
-                <Image src={coverPreview ?? magazine?.coverUrl} alt="Aperçu de la couverture" w="full" h="full" objectFit="cover" />
+                <Image
+                  src={coverPreview ?? magazine?.coverUrl}
+                  alt="Aperçu de la couverture"
+                  w="full"
+                  h="full"
+                  objectFit="cover"
+                />
               ) : (
-                <Flex h="full" align="center" justify="center" p="4" textAlign="center">
+                <Flex
+                  h="full"
+                  align="center"
+                  justify="center"
+                  p="4"
+                  textAlign="center"
+                >
                   <Text fontSize="sm" color="fg.muted">
                     La 1re page du PDF sera utilisée automatiquement.
                   </Text>
@@ -341,11 +431,23 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
               )}
             </Box>
             <HStack justify="center" gap="2" flexWrap="wrap">
-              <Button size="sm" variant="outline" rounded="full" onClick={() => coverInput.current?.click()} disabled={saving}>
+              <Button
+                size="sm"
+                variant="outline"
+                rounded="full"
+                onClick={() => coverInput.current?.click()}
+                disabled={saving}
+              >
                 <LuImage /> Choisir une image
               </Button>
               {customCover && (
-                <Button size="sm" variant="ghost" rounded="full" onClick={() => setCustomCover(null)} disabled={saving}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  rounded="full"
+                  onClick={() => setCustomCover(null)}
+                  disabled={saving}
+                >
                   <LuRotateCcw /> {pdfInfo ? "1re page du PDF" : "Annuler"}
                 </Button>
               )}
@@ -374,9 +476,13 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
               <Switch.Control />
               <Switch.Label>
                 <Stack gap="0">
-                  <Text fontWeight="medium">{isPublished ? "Publié" : "Brouillon"}</Text>
+                  <Text fontWeight="medium">
+                    {isPublished ? "Publié" : "Brouillon"}
+                  </Text>
                   <Text fontSize="xs" color="fg.muted">
-                    {isPublished ? "Visible dans le catalogue" : "Visible uniquement par toi"}
+                    {isPublished
+                      ? "Visible dans le catalogue"
+                      : "Visible uniquement par les admins"}
                   </Text>
                 </Stack>
               </Switch.Label>
@@ -394,7 +500,12 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
                 <Text fontSize="sm" color="fg.muted">
                   {progress.label}
                 </Text>
-                <Progress.Root value={progress.percent} colorPalette="brand" size="sm" rounded="full">
+                <Progress.Root
+                  value={progress.percent}
+                  colorPalette="brand"
+                  size="sm"
+                  rounded="full"
+                >
                   <Progress.Track rounded="full">
                     <Progress.Range />
                   </Progress.Track>
@@ -403,10 +514,23 @@ function MagazineFormFields({ magazine, storageMode, onSaved }: Props & { onSave
             )}
 
             <HStack gap="3">
-              <Button asChild variant="ghost" rounded="full" flex="1" disabled={saving}>
+              <Button
+                asChild
+                variant="ghost"
+                rounded="full"
+                flex="1"
+                disabled={saving}
+              >
                 <NextLink href="/admin">Annuler</NextLink>
               </Button>
-              <Button type="submit" colorPalette="brand" rounded="full" flex="2" loading={saving} disabled={analyzing}>
+              <Button
+                type="submit"
+                colorPalette="brand"
+                rounded="full"
+                flex="2"
+                loading={saving}
+                disabled={analyzing}
+              >
                 <LuSave /> {editing ? "Enregistrer" : "Créer le magazine"}
               </Button>
             </HStack>

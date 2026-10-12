@@ -26,7 +26,11 @@ import type { HeroSettings } from "@/lib/types";
 import { uploadFile, type StorageMode } from "@/lib/upload-client";
 import { saveHeroSettings } from "../actions";
 
-type Props = { initial: HeroSettings; defaults: HeroSettings; storageMode: StorageMode };
+type Props = {
+  initial: HeroSettings;
+  defaults: HeroSettings;
+  storageMode: StorageMode;
+};
 
 const card = {
   bg: "surface",
@@ -47,8 +51,14 @@ export function HeroForm({ initial, defaults, storageMode }: Props) {
   const [error, setError] = useState<string | null>(null);
   const imageInput = useRef<HTMLInputElement>(null);
 
-  const filePreview = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile]);
-  useEffect(() => () => void (filePreview && URL.revokeObjectURL(filePreview)), [filePreview]);
+  const filePreview = useMemo(
+    () => (imageFile ? URL.createObjectURL(imageFile) : null),
+    [imageFile],
+  );
+  useEffect(
+    () => () => void (filePreview && URL.revokeObjectURL(filePreview)),
+    [filePreview],
+  );
   const previewSrc = filePreview ?? (imageUrl || defaultHeroImage.src);
   const usingDefaultImage = !imageFile && !imageUrl;
 
@@ -63,10 +73,17 @@ export function HeroForm({ initial, defaults, storageMode }: Props) {
       setProgress(0);
       let finalImageUrl = imageUrl;
       if (imageFile) {
-        finalImageUrl = await uploadFile(imageFile, storageMode, (p) => setProgress(p));
+        finalImageUrl = await uploadFile(imageFile, storageMode, (p) =>
+          setProgress(p),
+        );
       }
       setProgress(100);
-      const result = await saveHeroSettings({ title, subtitle, description, imageUrl: finalImageUrl });
+      const result = await saveHeroSettings({
+        title,
+        subtitle,
+        description,
+        imageUrl: finalImageUrl,
+      });
       setProgress(null);
       if (!result.ok) return setError(result.error);
 
@@ -83,26 +100,33 @@ export function HeroForm({ initial, defaults, storageMode }: Props) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <Grid templateColumns={{ base: "1fr", xl: "1fr 1fr" }} gap="6" alignItems="start">
+      <Grid
+        templateColumns={{ base: "1fr", xl: "1fr 1fr" }}
+        gap="6"
+        alignItems="start"
+      >
         <Stack gap="6" {...card}>
-          <Stack gap="1">
-            <Heading size="lg">Section principale (hero)</Heading>
-            <Text fontSize="sm" color="fg.muted">
-              Le grand bloc en haut de la page d&apos;accueil.
-            </Text>
-          </Stack>
-
           <Field.Root required>
             <Field.Label>
               Titre <Field.RequiredIndicator />
             </Field.Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={defaults.title} maxLength={120} size="lg" />
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={defaults.title}
+              maxLength={120}
+              size="lg"
+            />
           </Field.Root>
 
           <Field.Root>
-            <Field.Label>Sous-titre (en dégradé)</Field.Label>
-            <Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder={defaults.subtitle} maxLength={160} />
-            <Field.HelperText>Affiché à la suite du titre, en couleur. Laisse vide pour le masquer.</Field.HelperText>
+            <Field.Label>Sous-titre</Field.Label>
+            <Input
+              value={subtitle}
+              onChange={(e) => setSubtitle(e.target.value)}
+              placeholder={defaults.subtitle}
+              maxLength={160}
+            />
           </Field.Root>
 
           <Field.Root>
@@ -131,11 +155,23 @@ export function HeroForm({ initial, defaults, storageMode }: Props) {
                 overflow="hidden"
                 flexShrink={0}
               >
-                <Image src={previewSrc} alt="Aperçu de l'image" w="full" h="full" objectFit="contain" />
+                <Image
+                  src={previewSrc}
+                  alt="Aperçu de l'image"
+                  w="full"
+                  h="full"
+                  objectFit="contain"
+                />
               </Box>
               <Stack gap="2">
                 <HStack gap="2" flexWrap="wrap">
-                  <Button size="sm" variant="outline" rounded="full" onClick={() => imageInput.current?.click()} disabled={saving}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    rounded="full"
+                    onClick={() => imageInput.current?.click()}
+                    disabled={saving}
+                  >
                     <LuImage /> Changer l&apos;image
                   </Button>
                   {!usingDefaultImage && (
@@ -154,8 +190,11 @@ export function HeroForm({ initial, defaults, storageMode }: Props) {
                   )}
                 </HStack>
                 <Text fontSize="xs" color="fg.muted">
-                  {imageFile ? imageFile.name : usingDefaultImage ? "Illustration par défaut" : "Image personnalisée"}
-                  {" · "}PNG à fond transparent recommandé
+                  {imageFile
+                    ? imageFile.name
+                    : usingDefaultImage
+                      ? "Illustration par défaut"
+                      : "Image personnalisée"}
                 </Text>
               </Stack>
             </HStack>
@@ -200,21 +239,22 @@ export function HeroForm({ initial, defaults, storageMode }: Props) {
             >
               <LuRotateCcw /> Textes par défaut
             </Button>
-            <Button type="submit" colorPalette="brand" rounded="full" loading={saving}>
+            <Button
+              type="submit"
+              colorPalette="brand"
+              rounded="full"
+              loading={saving}
+            >
               <LuSave /> Enregistrer
             </Button>
           </Flex>
         </Stack>
 
         <Stack gap="3" position={{ xl: "sticky" }} top={{ xl: "24" }}>
-          <HStack justify="space-between">
-            <Text fontWeight="medium" fontSize="sm" color="fg.muted">
-              Aperçu
-            </Text>
-            <Badge variant="outline" rounded="full">
-              Non enregistré tant que tu ne cliques pas sur « Enregistrer »
-            </Badge>
-          </HStack>
+          <Text fontWeight="medium" fontSize="sm" color="fg.muted">
+            Aperçu
+          </Text>
+
           <Flex
             bg="canvas"
             borderWidth="1px"
@@ -231,23 +271,46 @@ export function HeroForm({ initial, defaults, storageMode }: Props) {
             }}
           >
             <Stack gap="3" flex="1.3">
-              <Heading as="p" fontSize={{ base: "2xl", md: "3xl" }} lineHeight="1.1" fontWeight="bold" letterSpacing="tight">
+              <Heading
+                as="p"
+                fontSize={{ base: "2xl", md: "3xl" }}
+                lineHeight="1.1"
+                fontWeight="bold"
+                letterSpacing="tight"
+              >
                 {title || defaults.title}
                 {subtitle && " "}
                 {subtitle && (
-                  <Box as="span" bgGradient="to-r" gradientFrom="accentFrom" gradientTo="accentTo" bgClip="text">
+                  <Box
+                    as="span"
+                    bgGradient="to-r"
+                    gradientFrom="accentFrom"
+                    gradientTo="accentTo"
+                    bgClip="text"
+                  >
                     {subtitle}
                   </Box>
                 )}
               </Heading>
               {description && (
-                <Text fontSize="sm" color="fg.muted" whiteSpace="pre-line" lineClamp={5}>
+                <Text
+                  fontSize="sm"
+                  color="fg.muted"
+                  whiteSpace="pre-line"
+                  lineClamp={5}
+                >
                   {description}
                 </Text>
               )}
             </Stack>
             <Box flex="1" maxW="44">
-              <Image src={previewSrc} alt="" w="full" h="auto" filter="drop-shadow(0 12px 16px rgba(30, 10, 60, 0.3))" />
+              <Image
+                src={previewSrc}
+                alt=""
+                w="full"
+                h="auto"
+                filter="drop-shadow(0 12px 16px rgba(30, 10, 60, 0.3))"
+              />
             </Box>
           </Flex>
         </Stack>

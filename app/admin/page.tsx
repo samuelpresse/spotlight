@@ -1,4 +1,14 @@
-import { Badge, Box, Button, Container, Flex, HStack, Skeleton, Stack, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  Container,
+  Flex,
+  HStack,
+  Skeleton,
+  Stack,
+  Text,
+} from "@chakra-ui/react";
 import NextLink from "next/link";
 import { Suspense } from "react";
 import { LuPlus } from "react-icons/lu";
@@ -30,9 +40,15 @@ async function AdminDashboard() {
 
   return (
     <Stack gap="6">
-      <Flex justify="space-between" align={{ base: "flex-start", sm: "center" }} direction={{ base: "column", sm: "row" }} gap="4">
+      <Flex
+        justify="space-between"
+        align={{ base: "flex-start", sm: "center" }}
+        direction={{ base: "column", sm: "row" }}
+        gap="4"
+      >
         <Text color="fg.muted">
-          {magazines.length} magazine{magazines.length > 1 ? "s" : ""} · {published} publié{published > 1 ? "s" : ""}
+          {magazines.length} magazine{magazines.length > 1 ? "s" : ""} ·{" "}
+          {published} publié{published > 1 ? "s" : ""}
         </Text>
         <Button asChild colorPalette="brand" rounded="full">
           <NextLink href="/admin/new">
@@ -42,18 +58,6 @@ async function AdminDashboard() {
       </Flex>
 
       <MagazineTable magazines={magazines} />
-
-      <Box fontSize="xs" color="fg.subtle">
-        <HStack gap="2" flexWrap="wrap">
-          <Text>Stockage :</Text>
-          <Badge size="sm" variant="outline">
-            Base {dbMode === "postgres" ? "Postgres (Neon)" : "locale (.data/db.json)"}
-          </Badge>
-          <Badge size="sm" variant="outline">
-            Fichiers {storageMode === "blob" ? "Vercel Blob" : "locaux (.data/uploads)"}
-          </Badge>
-        </HStack>
-      </Box>
     </Stack>
   );
 }

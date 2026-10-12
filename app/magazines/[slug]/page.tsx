@@ -161,7 +161,7 @@ function MagazineView({
                 size="lg"
                 textTransform="uppercase"
               >
-                Numéro {magazine.issue}
+                {magazine.issue}
               </Badge>
             )}
             {!magazine.isPublished && (
